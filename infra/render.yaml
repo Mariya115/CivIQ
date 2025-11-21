@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: civiq-backend
+    env: node
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        fromDatabase:
+          name: civiq-db
+          property: connectionString
+          
+  - type: web
+    name: civiq-ai-service
+    env: python
+    buildCommand: cd ai_service && pip install -r requirements.txt
+    startCommand: cd ai_service && python app.py
+    
+databases:
+  - name: civiq-db
+    databaseName: civiq
+    user: civiq_user

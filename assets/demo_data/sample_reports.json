@@ -1,0 +1,26 @@
+[
+  {
+    "title": "Pothole on Main Street",
+    "description": "Large pothole causing traffic issues near the intersection",
+    "category": "infrastructure",
+    "location": {
+      "lat": 40.7128,
+      "lng": -74.0060,
+      "address": "Main Street, New York, NY"
+    },
+    "status": "reported",
+    "priority": "high"
+  },
+  {
+    "title": "Graffiti on Building Wall",
+    "description": "Vandalism on the side of the community center",
+    "category": "vandalism",
+    "location": {
+      "lat": 40.7589,
+      "lng": -73.9851,
+      "address": "Community Center, New York, NY"
+    },
+    "status": "in_progress",
+    "priority": "medium"
+  }
+]
