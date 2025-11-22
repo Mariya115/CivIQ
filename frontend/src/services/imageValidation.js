@@ -35,15 +35,6 @@ class AIValidationService {
     }
   }
 
-  fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.readAsDataURL(file)
-      reader.onload = () => resolve(reader.result.split(',')[1])
-      reader.onerror = error => reject(error)
-    })
-  }
-
   async performEnhancedValidation(file, category) {
     const filename = file.name.toLowerCase()
     const fileSize = file.size
@@ -166,6 +157,19 @@ class AIValidationService {
     }
   }
 
+  // Quick validation for real-time feedback
+  quickValidate(file) {
+    if (!file) return { isValid: false, message: 'No file selected' }
+    if (!file.type.startsWith('image/')) return { isValid: false, message: 'Please select an image file' }
+    if (file.size > 10 * 1024 * 1024) return { isValid: false, message: 'Image too large (max 10MB)' }
+    
+    const filename = file.name.toLowerCase()
+    const hasInvalidContent = this.invalidKeywords.some(keyword => filename.includes(keyword))
+    if (hasInvalidContent) return { isValid: false, message: 'Please upload a civic issue photo, not personal content' }
+    
+    return { isValid: true, message: 'Image ready for upload' }
+  }
+
   // Validate completion photos with enhanced checking
   async validateCompletionPhoto(imageFile, originalCategory) {
     const validation = await this.validateImage(imageFile, originalCategory)
@@ -188,19 +192,6 @@ class AIValidationService {
           ? '✅ Image uploaded. Please ensure it shows the completed work or resolved issue.'
           : '❌ Please upload a clear photo showing the completed work or resolved civic issue.'
     }
-  }
-
-  // Quick validation for real-time feedback
-  quickValidate(file) {
-    if (!file) return { isValid: false, message: 'No file selected' }
-    if (!file.type.startsWith('image/')) return { isValid: false, message: 'Please select an image file' }
-    if (file.size > 10 * 1024 * 1024) return { isValid: false, message: 'Image too large (max 10MB)' }
-    
-    const filename = file.name.toLowerCase()
-    const hasInvalidContent = this.invalidKeywords.some(keyword => filename.includes(keyword))
-    if (hasInvalidContent) return { isValid: false, message: 'Please upload a civic issue photo, not personal content' }
-    
-    return { isValid: true, message: 'Image ready for upload' }
   }
 }
 

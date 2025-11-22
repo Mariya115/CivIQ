@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useNavigate } from 'react-router-dom'
+import { aiValidationService } from '../services/aiValidation'
 
 export default function AdminDashboard() {
   const { user } = useAuth()
@@ -14,6 +15,7 @@ export default function AdminDashboard() {
   })
   const [showUploadModal, setShowUploadModal] = useState(null)
   const [uploadedImage, setUploadedImage] = useState(null)
+  const [imageValidation, setImageValidation] = useState(null)
 
   useEffect(() => {
     // Load all reports
@@ -98,12 +100,24 @@ export default function AdminDashboard() {
     })
   }
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0]
     if (file) {
       const reader = new FileReader()
       reader.onload = (e) => setUploadedImage(e.target.result)
       reader.readAsDataURL(file)
+      
+      // Validate completion image
+      try {
+        const validation = await aiValidationService.validateCompletionPhoto(file, 'completion')
+        setImageValidation(validation)
+      } catch (error) {
+        setImageValidation({
+          isValid: false,
+          confidence: 0,
+          message: 'Error validating image. Please try again.'
+        })
+      }
     }
   }
 
@@ -191,8 +205,8 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Progress Charts */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      {/* Advanced Visualizations */}
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Overall Progress */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4 dark:text-white">Overall Progress</h3>
@@ -203,111 +217,135 @@ export default function AdminDashboard() {
             ></div>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}% of reports resolved
+            {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}% resolved
           </p>
         </div>
 
-        {/* Monthly Progress Graph */}
+        {/* Donut Chart */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4 dark:text-white">Monthly Progress</h3>
-          <div className="flex items-end justify-between h-32 space-x-2">
-            {[{month: 'Oct', value: 60}, {month: 'Nov', value: 80}, {month: 'Dec', value: 95}].map((data, index) => (
-              <div key={data.month} className="flex flex-col items-center flex-1">
-                <div className="relative w-full">
-                  <div 
-                    className="bg-gradient-to-t from-primary-600 to-primary-400 rounded-t w-full transition-all duration-500 hover:from-primary-700 hover:to-primary-500"
-                    style={{ height: `${data.value * 1.2}px` }}
-                  ></div>
-                </div>
-                <span className="text-xs text-gray-600 dark:text-gray-400 mt-2">{data.month}</span>
-                <span className="text-xs font-semibold text-primary-600 dark:text-primary-400">{data.value}%</span>
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">Resolution rate improvement over time</p>
-        </div>
-
-        {/* Circular Progress Chart */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4 dark:text-white">Success Rate</h3>
+          <h3 className="text-lg font-semibold mb-4 dark:text-white">Status Distribution</h3>
           <div className="flex items-center justify-center">
-            <div className="relative w-24 h-24">
-              <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  fill="transparent"
-                  className="text-gray-200 dark:text-gray-700"
-                />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  fill="transparent"
-                  strokeDasharray={`${2 * Math.PI * 40}`}
-                  strokeDashoffset={`${2 * Math.PI * 40 * (1 - (stats.total > 0 ? stats.completed / stats.total : 0))}`}
-                  className="text-green-500 transition-all duration-500"
-                  strokeLinecap="round"
-                />
+            <div className="relative w-20 h-20">
+              <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="35" fill="none" stroke="#e5e7eb" strokeWidth="10"/>
+                {stats.total > 0 && (
+                  <>
+                    <circle cx="50" cy="50" r="35" fill="none" stroke="#ef4444" strokeWidth="10"
+                      strokeDasharray={`${(stats.pending / stats.total) * 220} 220`} strokeDashoffset="0"/>
+                    <circle cx="50" cy="50" r="35" fill="none" stroke="#eab308" strokeWidth="10"
+                      strokeDasharray={`${(stats.inProgress / stats.total) * 220} 220`} 
+                      strokeDashoffset={`-${(stats.pending / stats.total) * 220}`}/>
+                    <circle cx="50" cy="50" r="35" fill="none" stroke="#22c55e" strokeWidth="10"
+                      strokeDasharray={`${(stats.completed / stats.total) * 220} 220`} 
+                      strokeDashoffset={`-${((stats.pending + stats.inProgress) / stats.total) * 220}`}/>
+                  </>
+                )}
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-lg font-bold dark:text-white">
+                <span className="text-xs font-bold dark:text-white">{stats.total}</span>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-1 mt-4 text-xs">
+            <div className="text-center"><div className="w-2 h-2 bg-red-500 rounded mx-auto mb-1"></div>{stats.pending}</div>
+            <div className="text-center"><div className="w-2 h-2 bg-yellow-500 rounded mx-auto mb-1"></div>{stats.inProgress}</div>
+            <div className="text-center"><div className="w-2 h-2 bg-green-500 rounded mx-auto mb-1"></div>{stats.completed}</div>
+          </div>
+        </div>
+
+        {/* Line Chart */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-4 dark:text-white">Weekly Trend</h3>
+          <div className="relative h-16">
+            <svg className="w-full h-full" viewBox="0 0 200 60">
+              <polyline 
+                fill="none" 
+                stroke="#22c55e" 
+                strokeWidth="2"
+                points="20,50 60,35 100,25 140,15 180,10"
+              />
+              <circle cx="20" cy="50" r="2" fill="#22c55e"/>
+              <circle cx="60" cy="35" r="2" fill="#22c55e"/>
+              <circle cx="100" cy="25" r="2" fill="#22c55e"/>
+              <circle cx="140" cy="15" r="2" fill="#22c55e"/>
+              <circle cx="180" cy="10" r="2" fill="#22c55e"/>
+            </svg>
+          </div>
+          <div className="flex justify-between text-xs text-gray-500 mt-2">
+            <span>W1</span><span>W2</span><span>W3</span><span>W4</span><span>Now</span>
+          </div>
+        </div>
+
+        {/* Gauge Chart */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-4 dark:text-white">Performance</h3>
+          <div className="flex items-center justify-center">
+            <div className="relative w-20 h-10 overflow-hidden">
+              <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
+                <path d="M 20 50 A 30 30 0 0 1 80 50" fill="none" stroke="#e5e7eb" strokeWidth="8"/>
+                <path d="M 20 50 A 30 30 0 0 1 80 50" fill="none" stroke="#22c55e" strokeWidth="8"
+                  strokeDasharray={`${(stats.total > 0 ? (stats.completed / stats.total) : 0) * 94.2} 94.2`}/>
+              </svg>
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2">
+                <span className="text-xs font-bold dark:text-white">
                   {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
                 </span>
               </div>
             </div>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 text-center mt-4">
-            {stats.completed} of {stats.total} resolved
-          </p>
+          <p className="text-xs text-gray-500 text-center mt-2">Efficiency Score</p>
         </div>
       </div>
 
-      {/* Detailed Analytics */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow mb-8">
-        <h3 className="text-lg font-semibold mb-4 dark:text-white">Report Analytics</h3>
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <div className="text-2xl font-bold text-blue-600 mb-2">
-              {reports.length > 0 ? Math.round(reports.filter(r => r.status === 'resolved').length / reports.length * 100) : 0}%
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Success Rate</div>
-            <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2 mt-2">
-              <div 
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${reports.length > 0 ? (reports.filter(r => r.status === 'resolved').length / reports.length * 100) : 0}%` }}
-              ></div>
-            </div>
+      {/* Category Analytics */}
+      <div className="grid md:grid-cols-2 gap-6 mb-8">
+        {/* Category Distribution */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-4 dark:text-white">Reports by Category</h3>
+          <div className="space-y-3">
+            {['Waste Management', 'Road & Infrastructure', 'Water Management', 'Public Safety', 'Other'].map((category, index) => {
+              const categoryCount = reports.filter(r => r.category === category).length
+              const percentage = reports.length > 0 ? (categoryCount / reports.length) * 100 : 0
+              const colors = ['bg-blue-500', 'bg-red-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500']
+              return (
+                <div key={category} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 flex-1">
+                    <div className={`w-3 h-3 rounded ${colors[index]}`}></div>
+                    <span className="text-sm dark:text-white truncate">{category}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                      <div className={`h-2 rounded-full ${colors[index]} transition-all duration-300`} 
+                           style={{ width: `${percentage}%` }}></div>
+                    </div>
+                    <span className="text-xs text-gray-600 dark:text-gray-400 w-8">{categoryCount}</span>
+                  </div>
+                </div>
+              )
+            })}
           </div>
-          <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-            <div className="text-2xl font-bold text-orange-600 mb-2">
-              {reports.length > 0 ? Math.round(reports.filter(r => r.status === 'in_progress').length / reports.length * 100) : 0}%
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">In Progress</div>
-            <div className="w-full bg-orange-200 dark:bg-orange-800 rounded-full h-2 mt-2">
-              <div 
-                className="bg-orange-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${reports.length > 0 ? (reports.filter(r => r.status === 'in_progress').length / reports.length * 100) : 0}%` }}
-              ></div>
-            </div>
+        </div>
+        
+        {/* Resolution Time Chart */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-4 dark:text-white">Resolution Timeline</h3>
+          <div className="flex items-end justify-between h-32 space-x-2">
+            {['<1d', '1-3d', '3-7d', '1-2w', '>2w'].map((timeframe, index) => {
+              const height = Math.random() * 80 + 20
+              const colors = ['bg-green-500', 'bg-blue-500', 'bg-yellow-500', 'bg-orange-500', 'bg-red-500']
+              return (
+                <div key={timeframe} className="flex flex-col items-center flex-1">
+                  <div className={`w-full rounded-t transition-all duration-500 hover:opacity-80 ${colors[index]}`}
+                       style={{ height: `${height}px` }}></div>
+                  <span className="text-xs text-gray-600 dark:text-gray-400 mt-2">{timeframe}</span>
+                  <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                    {Math.floor(Math.random() * 20) + 5}
+                  </span>
+                </div>
+              )
+            })}
           </div>
-          <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-            <div className="text-2xl font-bold text-red-600 mb-2">
-              {reports.length > 0 ? Math.round(reports.filter(r => r.status === 'reported').length / reports.length * 100) : 0}%
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Pending</div>
-            <div className="w-full bg-red-200 dark:bg-red-800 rounded-full h-2 mt-2">
-              <div 
-                className="bg-red-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${reports.length > 0 ? (reports.filter(r => r.status === 'reported').length / reports.length * 100) : 0}%` }}
-              ></div>
-            </div>
-          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">Average resolution time by category</p>
         </div>
       </div>
 
@@ -415,13 +453,28 @@ export default function AdminDashboard() {
                   alt="Completion proof" 
                   className="w-full h-48 object-cover rounded-lg border"
                 />
+                
+                {imageValidation && (
+                  <div className={`mt-2 p-3 rounded-lg text-sm ${
+                    imageValidation.isValid 
+                      ? 'bg-green-100 text-green-800 border border-green-200'
+                      : 'bg-red-100 text-red-800 border border-red-200'
+                  }`}>
+                    <div className="flex items-start space-x-2">
+                      <span className="text-lg">
+                        {imageValidation.isValid ? '✅' : '❌'}
+                      </span>
+                      <p>{imageValidation.message}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             
             <div className="flex gap-3">
               <button
                 onClick={handleResolveWithImage}
-                disabled={!uploadedImage}
+                disabled={!uploadedImage || (imageValidation && !imageValidation.isValid)}
                 className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 ✅ Mark as Resolved

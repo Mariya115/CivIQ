@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { reportsService } from '../services/reports'
 import { useAuth } from '../hooks/useAuth'
+import { aiValidationService } from '../services/imageValidation'
 
 export default function ReportForm() {
   const [formData, setFormData] = useState({
@@ -14,6 +15,8 @@ export default function ReportForm() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [locationLoading, setLocationLoading] = useState(false)
+  const [imageValidation, setImageValidation] = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
   const navigate = useNavigate()
   const { user } = useAuth()
   
@@ -81,6 +84,14 @@ export default function ReportForm() {
       alert('Please fill in title and category')
       return
     }
+
+    // Check image validation if image is uploaded
+    if (formData.image && imageValidation && !imageValidation.isValid) {
+      const proceed = window.confirm(
+        `Warning: ${imageValidation.message}\n\nDo you want to proceed anyway?`
+      )
+      if (!proceed) return
+    }
     
     setLoading(true)
     
@@ -90,7 +101,13 @@ export default function ReportForm() {
         description: formData.description,
         category: formData.category,
         location: formData.location,
-        points_awarded: 15,
+        image: formData.image ? {
+          name: formData.image.name,
+          size: formData.image.size,
+          type: formData.image.type,
+          dataUrl: imagePreview
+        } : null,
+        points_awarded: 50,
         status: 'reported'
       }
       
@@ -113,6 +130,8 @@ export default function ReportForm() {
           image: null,
           location: null
         })
+        setImageValidation(null)
+        setImagePreview(null)
         setTimeout(() => navigate('/my-reports'), 2000)
       }
     } catch (err) {
@@ -123,8 +142,51 @@ export default function ReportForm() {
     setLoading(false)
   }
 
-  const handleImageUpload = (e) => {
-    setFormData({...formData, image: e.target.files[0]})
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) {
+      setFormData({...formData, image: null})
+      setImageValidation(null)
+      setImagePreview(null)
+      return
+    }
+
+    // Create preview
+    const reader = new FileReader()
+    reader.onload = (e) => setImagePreview(e.target.result)
+    reader.readAsDataURL(file)
+
+    // Quick validation first
+    const quickCheck = aiValidationService.quickValidate(file)
+    if (!quickCheck.isValid) {
+      setImageValidation({
+        isValid: false,
+        confidence: 0,
+        message: quickCheck.message
+      })
+      setFormData({...formData, image: null})
+      return
+    }
+
+    // Full validation
+    try {
+      const validation = await aiValidationService.validateImage(file, formData.category)
+      setImageValidation(validation)
+      
+      if (validation.isValid) {
+        setFormData({...formData, image: file})
+      } else {
+        setFormData({...formData, image: null})
+      }
+    } catch (error) {
+      console.error('Image validation error:', error)
+      setImageValidation({
+        isValid: false,
+        confidence: 0,
+        message: '❌ Error validating image. Please try a different image.'
+      })
+      setFormData({...formData, image: null})
+    }
   }
 
   return (
@@ -196,6 +258,66 @@ export default function ReportForm() {
               onChange={handleImageUpload}
               className="w-full p-3 border rounded-lg"
             />
+            
+            {/* Image Preview */}
+            {imagePreview && (
+              <div className="mt-3">
+                <img 
+                  src={imagePreview} 
+                  alt="Preview" 
+                  className="max-w-xs max-h-48 object-cover rounded-lg border"
+                />
+              </div>
+            )}
+            
+            {/* Image Validation Feedback */}
+            {imageValidation && (
+              <div className={`mt-3 p-4 rounded-lg border-l-4 ${
+                imageValidation.isValid 
+                  ? 'bg-green-50 border-green-400 text-green-800'
+                  : 'bg-red-50 border-red-400 text-red-800'
+              }`}>
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0 text-xl">
+                    {imageValidation.isValid ? '✅' : '❌'}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">{imageValidation.message}</p>
+                    {imageValidation.confidence > 0 && (
+                      <div className="mt-2 flex items-center space-x-2">
+                        <div className="bg-gray-200 rounded-full h-2 flex-1">
+                          <div 
+                            className={`h-2 rounded-full ${
+                              imageValidation.confidence > 0.7 ? 'bg-green-500' :
+                              imageValidation.confidence > 0.4 ? 'bg-yellow-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${imageValidation.confidence * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-xs font-medium">
+                          {Math.round(imageValidation.confidence * 100)}% relevance
+                        </span>
+                      </div>
+                    )}
+                    {imageValidation.suggestedCategory && imageValidation.suggestedCategory !== formData.category && (
+                      <p className="text-xs mt-2 opacity-75">
+                        💡 Suggested category: {imageValidation.suggestedCategory}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800 font-medium mb-2">📸 Photo Guidelines:</p>
+              <ul className="text-xs text-blue-700 space-y-1">
+                <li>• Show the actual civic problem clearly</li>
+                <li>• Avoid personal photos, selfies, or unrelated content</li>
+                <li>• Include surroundings for context</li>
+                <li>• Max file size: 10MB (JPG, PNG, GIF)</li>
+              </ul>
+            </div>
           </div>
 
           {success && (

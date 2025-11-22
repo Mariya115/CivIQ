@@ -67,7 +67,7 @@ export default function MapView() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-6">Civic Issues Map</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center">Civic Issues Map</h1>
       
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2">Filter by Category</label>

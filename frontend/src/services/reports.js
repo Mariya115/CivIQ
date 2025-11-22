@@ -15,7 +15,13 @@ export const reportsService = {
       user_id: user.id,
       user_email: user.email,
       created_at: new Date().toISOString(),
-      status: 'reported'
+      last_updated: new Date().toISOString(),
+      status: 'reported',
+      status_history: [{
+        status: 'reported',
+        timestamp: new Date().toISOString(),
+        updated_by: user.email
+      }]
     }
     
     // Get existing reports
@@ -35,6 +41,13 @@ export const reportsService = {
   },
 
   generateDownloadableReport(report, user) {
+    const imageSection = report.image ? `
+          <div class="field">
+            <span class="label">Attached Image:</span><br>
+            <img src="${report.image.dataUrl}" alt="Report Image" style="max-width: 400px; max-height: 300px; margin-top: 10px; border: 1px solid #ccc;">
+            <br><small>File: ${report.image.name} (${(report.image.size / 1024).toFixed(1)} KB)</small>
+          </div>` : ''
+    
     const reportHtml = `
       <!DOCTYPE html>
       <html>
@@ -66,7 +79,7 @@ export const reportsService = {
           </div>
           <div class="field">
             <span class="label">Location:</span> ${report.address || 'Not specified'}
-          </div>
+          </div>${imageSection}
           <div class="field">
             <span class="label">Reported by:</span> ${user.user_metadata?.name || 'Anonymous'}
           </div>
@@ -80,7 +93,7 @@ export const reportsService = {
             <span class="label">Status:</span> ${report.status.toUpperCase()}
           </div>
           <div class="field">
-            <span class="label">Civil Points Earned:</span> +50 points
+            <span class="label">Citizen Points Earned:</span> +50 points
           </div>
         </div>
         <div class="footer">
@@ -139,5 +152,52 @@ export const reportsService = {
     })
     
     return { data: reportsWithCoords, error: null }
+  },
+
+  async resolveReport(reportId, workerEmail) {
+    const allReports = JSON.parse(localStorage.getItem('civiq_reports') || '[]')
+    const reportIndex = allReports.findIndex(report => report.id === reportId)
+    
+    if (reportIndex === -1) {
+      return { data: null, error: { message: 'Report not found' } }
+    }
+    
+    // Update report status
+    allReports[reportIndex].status = 'resolved'
+    allReports[reportIndex].resolved_at = new Date().toISOString()
+    allReports[reportIndex].resolved_by = workerEmail
+    localStorage.setItem('civiq_reports', JSON.stringify(allReports))
+    
+    // Award 20 points to worker
+    const points = JSON.parse(localStorage.getItem('civiq_user_points') || '{}')
+    points[workerEmail] = (points[workerEmail] || 0) + 20
+    localStorage.setItem('civiq_user_points', JSON.stringify(points))
+    
+    return { data: allReports[reportIndex], error: null }
+  },
+
+  async updateReportStatus(reportId, newStatus, updatedBy = null) {
+    const allReports = JSON.parse(localStorage.getItem('civiq_reports') || '[]')
+    const reportIndex = allReports.findIndex(report => report.id === reportId)
+    
+    if (reportIndex === -1) {
+      return { data: null, error: { message: 'Report not found' } }
+    }
+    
+    allReports[reportIndex].status = newStatus
+    allReports[reportIndex].last_updated = new Date().toISOString()
+    
+    if (!allReports[reportIndex].status_history) {
+      allReports[reportIndex].status_history = []
+    }
+    
+    allReports[reportIndex].status_history.push({
+      status: newStatus,
+      timestamp: new Date().toISOString(),
+      updated_by: updatedBy
+    })
+    
+    localStorage.setItem('civiq_reports', JSON.stringify(allReports))
+    return { data: allReports[reportIndex], error: null }
   }
 }

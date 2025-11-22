@@ -239,7 +239,14 @@ export default function Events() {
               <div className="text-center py-8">
                 <div className="text-green-600 text-4xl mb-4">✓</div>
                 <h3 className="text-lg font-semibold text-green-800 mb-2">Successfully registered!</h3>
-                <p className="text-sm text-gray-600">Check email for details.</p>
+                <p className="text-sm text-gray-600 mb-3">Confirmation sent to:</p>
+                <a 
+                  href={`mailto:${formData.email}?subject=Event Registration Confirmation - ${selectedEvent?.title}&body=Thank you for registering for ${selectedEvent?.title}. Event details and location will be shared closer to the date.`}
+                  className="text-primary-600 hover:text-primary-800 hover:underline transition-colors text-sm"
+                  title="Click to open email"
+                >
+                  {formData.email}
+                </a>
               </div>
             ) : (
               <form onSubmit={handleRegistration} className="space-y-4">
@@ -260,7 +267,7 @@ export default function Events() {
                   <input
                     type="email"
                     required
-                    className="w-full p-3 border rounded-lg"
+                    className="w-full p-3 border rounded-lg hover:border-primary-400 focus:border-primary-500 transition-colors"
                     placeholder="you@example.com"
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}

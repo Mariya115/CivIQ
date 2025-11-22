@@ -28,9 +28,9 @@ function App() {
     <ThemeProvider>
       <LanguageProvider>
         <Router>
-          <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+          <div className="min-h-screen transition-colors bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
             <Header />
-            <main className="container mx-auto px-4 py-8">
+            <main className="relative z-10">
               <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<Login />} />
